@@ -31,12 +31,32 @@ theme_manhattan <- theme_bw() +
 chromosome_lengths <- read.csv('data/TAIR10_chromosomes.csv')
 chromosome_lengths_l <- chromosome_lengths %>% pivot_longer(cols = c(start, end), values_to="bp", names_to = "position_type")
 
-# Fake a GWAS peak, replace with actual data later.
-fake_GWAS <- data.frame(
-  chr = "Chr2",
-  position = runif(40, 2230000,3440000),     
-  pval = runif(40, 0.7, 1)
-)
+# Read data and manipulate dataframes to make them compatible with the Manhattan plot canvas
+results_folder <- 'casper_gr_tryp_results' # this should be replaced by a newly generated results folder
+
+kmers_locations <- read.table(paste0("results/", results_folder, "/kmer_mapping.tsv"))
+colnames(kmers_locations) <- c("kmer","sam_classification", "chromosome", "position")
+kmers_pvalues <- read.table(paste0("results/", results_folder, "/kmer_pvalues.tsv"))
+colnames(kmers_pvalues) <- c("kmer", "p_val")
+
+# Get the thresholds for significance
+threshold_10 <- scan(paste0("results/", results_folder, "/threshold_10per"))
+threshold_5 <- scan(paste0("results/", results_folder, "/threshold_5per"))
+
+# Remove kmers without mapping ("*"), and transform the NCBI chromosome headers to Chr1, etc
+# This code should be removed if we pick the right reference genome for the mapping
+kmers_locations <- kmers_locations %>% filter(chromosome != "*") %>%
+  mutate(chr = case_when(
+    chromosome == "NC_003070.9" ~ "Chr1",
+    chromosome == "NC_003071.7" ~ "Chr2",
+    chromosome == "NC_003074.8" ~ "Chr3",
+    chromosome == "NC_003075.7" ~ "Chr4",
+    chromosome == "NC_003076.8" ~ "Chr5",
+    TRUE ~ chromosome 
+  ))
+
+# Merge the positions table with p-value table
+kmers_merged <- left_join(kmers_locations, kmers_pvalues, by = "kmer")
 
 
 ui <- fluidPage(
@@ -61,11 +81,17 @@ server <-
     
     # The manhattan plot is made here
     output$manhattan <- renderPlot({
-      
       ggplot() + 
-        geom_blank(data = chromosome_lengths_l, aes(x = bp, y = 0)) + 
+        geom_blank(data = chromosome_lengths_l, aes(x = bp, y = threshold_10 - 0.5)) + 
         facet_grid(~chr, scales = "free_x", space = "free_x") +
-        geom_point(data = fake_GWAS, aes(x = position, y = pval)) + facet_grid(~chr, scales = "free_x", space = "free_x") + theme_manhattan
+        geom_hline(yintercept = threshold_10, col = "#56B3E9", linetype = "dashed") +
+        geom_hline(yintercept = threshold_5, col = "#E69F00", linetype = "dashed") +
+        
+        # I use height jitter to avoid overlapping points with nearly the same location and the same p value
+        # Possible edit: make this interactive to enable people to make a 'true' plot and jittered plot.
+        geom_jitter(data = kmers_merged, aes(x = position, y = -log10(p_val)), alpha = 0.3, width = 0, height = 0.05) + 
+        facet_grid(~chr, scales = "free_x", space = "free_x") + 
+        theme_manhattan
       
     })
     
