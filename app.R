@@ -1,6 +1,8 @@
 library(igvShiny)
 library(ggplot2)
 library(tidyverse)
+library(rtracklayer)
+library(GenomicAlignments)
 
 source("helpers.R")
 
@@ -14,6 +16,10 @@ options <- parseAndValidateGenomeSpec(
   fastaIndex = 'data/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.fai',
   genomeAnnotation = 'data/Arabidopsis_thaliana.TAIR10.62.gff3'
 )
+
+# Initialize the BAM file
+bam_options <- readGAlignments('results/FT10_results/kmer_mapping.bam')
+user_config <- list(visibilityWindow = 10000000, showAllBases = TRUE)
 
 # Theme options for the manhattan plot
 theme_manhattan <- theme_bw() +
@@ -32,7 +38,7 @@ chromosome_lengths <- read.csv('data/TAIR10_chromosomes.csv')
 chromosome_lengths_l <- chromosome_lengths %>% pivot_longer(cols = c(start, end), values_to="bp", names_to = "position_type")
 
 # Read data and manipulate dataframes to make them compatible with the Manhattan plot canvas
-results_folder <- 'casper_gr_tryp_results' # this should be replaced by a newly generated results folder
+results_folder <- 'FT10_results' # this should be replaced by a newly generated results folder
 
 kmers_locations <- read.table(paste0("results/", results_folder, "/kmer_mapping.tsv"))
 colnames(kmers_locations) <- c("kmer","sam_classification", "chromosome", "position")
@@ -47,19 +53,22 @@ threshold_5 <- scan(paste0("results/", results_folder, "/threshold_5per"))
 # This code should be removed if we pick the right reference genome for the mapping
 kmers_locations <- kmers_locations %>% filter(chromosome != "*") %>%
   mutate(chr = case_when(
-    chromosome == "NC_003070.9" ~ "Chr1",
-    chromosome == "NC_003071.7" ~ "Chr2",
-    chromosome == "NC_003074.8" ~ "Chr3",
-    chromosome == "NC_003075.7" ~ "Chr4",
-    chromosome == "NC_003076.8" ~ "Chr5",
+    chromosome == "1" ~ "Chr1",
+    chromosome == "2" ~ "Chr2",
+    chromosome == "3" ~ "Chr3",
+    chromosome == "4" ~ "Chr4",
+    chromosome == "5" ~ "Chr5",
     TRUE ~ chromosome 
   ))
 
 # Merge the positions table with p-value table
 kmers_merged <- left_join(kmers_locations, kmers_pvalues, by = "kmer")
 
-
 ui <- fluidPage(
+  
+  ###
+  actionButton("addBamLocalFileButton", "BAM local data"),
+  
   
   ######### Header section with value boxes
   
@@ -95,18 +104,29 @@ server <-
       
     })
     
+    
+    observeEvent(input$addBamLocalFileButton, {
+    loadBamTrackFromLocalData(session,
+                              id = "igvShiny",
+                              trackName = 'kmer_mapping.bam',
+                              data = bam_options,
+                              displayMode = "EXPANDED",
+                              trackConfig = user_config)
+    })
+    
     # The genome browser is initiated here
     output$igvShiny <- renderIgvShiny(
       igvShiny(options)
     )
+    
+    
     
     # Debugging observe function
     observe({
       print(input$coord_brush$xmin)
       print(input$coord_brush$xmax)
       print(input$coord_brush$panelvar1)
-    })
-    
+    })  
     
      # Update IGV viewer based on brush selection
   observeEvent(input$coord_brush, {
