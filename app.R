@@ -3,6 +3,7 @@ library(ggplot2)
 library(tidyverse)
 library(rtracklayer)
 library(GenomicAlignments)
+library(plotly)
 
 source("helpers.R")
 
@@ -19,7 +20,7 @@ options <- parseAndValidateGenomeSpec(
 
 # Initialize the BAM file
 bam_options <- readGAlignments('results/FT10_results/kmer_mapping.bam')
-user_config <- list(visibilityWindow = 10000000, showAllBases = TRUE)
+user_config <- list(visibilityWindow = 10000000)
 
 # Theme options for the manhattan plot
 theme_manhattan <- theme_bw() +
@@ -78,7 +79,9 @@ ui <- fluidPage(
   
   ######### Manhattan plot section (brushable x axis to determine plotting window of IGV)
   h2("Manhattan plot"),
-  plotOutput("manhattan", brush = brushOpts(id = "coord_brush", direction = "x")),
+  plotOutput("manhattan", 
+             brush = brushOpts(id = "coord_brush", direction = "x"),
+             click = clickOpts(id = "coord_click")),
   
   ######## IGV window section
   h2("Genome browser"),
@@ -101,7 +104,7 @@ server <-
         geom_jitter(data = kmers_merged, aes(x = position, y = -log10(p_val)), alpha = 0.3, width = 0, height = 0.05) + 
         facet_grid(~chr, scales = "free_x", space = "free_x") + 
         theme_manhattan
-      
+     
     })
     
     
@@ -119,8 +122,6 @@ server <-
       igvShiny(options)
     )
     
-    
-    
     # Debugging observe function
     observe({
       print(input$coord_brush$xmin)
@@ -128,18 +129,28 @@ server <-
       print(input$coord_brush$panelvar1)
     })  
     
-     # Update IGV viewer based on brush selection
-  observeEvent(input$coord_brush, {
+    # Update IGV viewer based on brush selection (dragging x coordinates)
+    observeEvent(input$coord_brush, {
     
-    new_xmin <- input$coord_brush$xmin
-    new_xmax <-input$coord_brush$xmax
-    new_chromosome <- input$coord_brush$panelvar1
-    
-    new_locus <- paste0(new_chromosome, ":", new_xmin, "-", new_xmax)
+      new_xmin <- input$coord_brush$xmin
+      new_xmax <-input$coord_brush$xmax
+      new_chromosome <- input$coord_brush$panelvar1
       
-    # Update IGV viewer to show the selected region
-    showGenomicRegion(session, id = "igvShiny", new_locus)
-  })
+      new_locus <- paste0(new_chromosome, ":", new_xmin, "-", new_xmax)
+      showGenomicRegion(session, id = "igvShiny", new_locus)
+    })
+  
+    # or on click event, with 15kb up- and downstream of click. Not sure which one works best.
+    observeEvent(input$coord_click, {
+      
+      new_x <- input$coord_click$x
+      new_chromosome <- input$coord_click$panelvar1
+      
+      new_locus <- paste0(new_chromosome, ":", new_x - 15000, "-", new_x + 15000)
+      
+      # Update IGV viewer to show the selected region
+      showGenomicRegion(session, id = "igvShiny", new_locus)
+    })
 }
 
 
