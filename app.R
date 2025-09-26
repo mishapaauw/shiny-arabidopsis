@@ -1,4 +1,5 @@
 library(igvShiny)
+library(bslib)
 library(ggplot2)
 library(tidyverse)
 library(rtracklayer)
@@ -65,17 +66,45 @@ kmers_locations <- kmers_locations %>% filter(chromosome != "*") %>%
 # Merge the positions table with p-value table
 kmers_merged <- left_join(kmers_locations, kmers_pvalues, by = "kmer")
 
-ui <- fluidPage(
+# Load phenotypes (original and used)
+original_pheno <- read.table(paste0("results/", results_folder, "/pheno.original_phenotypes"), header = TRUE)
+used_pheno <- read.table(paste0("results/", results_folder, "/pheno.phenotypes"), header = TRUE)
+
+original_pheno$dataset = "original"
+used_pheno$dataset = "used"
+
+original_pheno$dataset_n = paste0("original (n = ", length(original_pheno$phenotype_value), ")")
+used_pheno$dataset_n = paste0("used (n = ", length(used_pheno$phenotype_value), ")")
+
+phenotype <- rbind(original_pheno, used_pheno)
+phenotype$dataset <- as.factor(phenotype$dataset)
+
+
+
+##### Shiny dashboard starts here
+
+ui <- page_sidebar(
+  title = "kmer GWAS dashboard",
+  sidebar = sidebar(
+    h4("click to add kmer mapping bam file:"),
+    actionButton("addBamLocalFileButton", "BAM local data"),
+    h4('Phenotype histogram'),
+    checkboxGroupInput("datasets",
+                       "Select phenotype dataset(s) to plot:",
+                       choices = c("Used" = "used", "Original" = "original"),
+                       selected = c("used", "original"))
+
+  ),
   
-  ###
-  actionButton("addBamLocalFileButton", "BAM local data"),
-  
-  
+  # Main dashboard content goes here
+
   ######### Header section with value boxes
-  
   h2("kmer GWAS results"),
   valueBox("42", "Significant kmers (5 per)", color = "#E69F00", width = "150px"),
   valueBox("123", "Significant kmers (10 per)", color = "#56B4E9", width = "150px"),
+  
+  # histogram
+  plotOutput('histogram'),
   
   ######### Manhattan plot section (brushable x axis to determine plotting window of IGV)
   h2("Manhattan plot"),
@@ -86,10 +115,30 @@ ui <- fluidPage(
   ######## IGV window section
   h2("Genome browser"),
   igvShinyOutput('igvShiny')
-  )
+)
 
 server <-
   function(input, output, session) {
+    
+    # Phenotype histograms
+    output$histogram <- renderPlot({
+      selected <- input$datasets
+        
+        ggplot(phenotype %>% filter(dataset %in% selected), aes(x = phenotype_value, fill = dataset_n)) +
+          geom_histogram(position = "identity", alpha = 0.5, bins = 100, colour = 'black') +
+          labs(x = "Phenotype value", y = "Count") +
+          theme_bw() +
+          theme(
+            panel.grid.major.x = element_blank(),  
+            panel.grid.minor.x = element_blank(),  
+            panel.grid.minor.y = element_blank(),
+            panel.grid.major.y = element_blank(),
+          )
+      
+    })
+    
+    
+    
     
     # The manhattan plot is made here
     output$manhattan <- renderPlot({
@@ -127,6 +176,7 @@ server <-
       print(input$coord_brush$xmin)
       print(input$coord_brush$xmax)
       print(input$coord_brush$panelvar1)
+      print(input$selected)
     })  
     
     # Update IGV viewer based on brush selection (dragging x coordinates)

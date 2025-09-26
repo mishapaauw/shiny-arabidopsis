@@ -42,10 +42,14 @@ The following things need to be implemented
 
 *Phenotype visualization*:
 
-- Make phenotype distribution histogram > Use the 'pheno.phenotypes' file as this contains the accessions that were actually used. Actually also add this number in another valuebox? Together with the number of accessions that were submitted by the user.
+- Make phenotype distribution histogram: done
+- Make sure that the cmd line scripts copy both files ('pheno.phenotypes' and 'pheno.used_phenotypes') to the results folder 
+    
 - Make 'candlestick chart' of selected kmers, with option to highlight genome of interest
     - For this, we need a mapping file between nordberg IDs and accession names.
     - how to select kmers? probably not possible in the IGV window.
+    - Need to get presence absence pattern for all kmers instead of top100. (and turn of automated plotting as currently implemented)
 
-When everything is implemented, we move to the design phase where we optimize graph appearance and overal dashboard appearance.
+When everything is implemented, we move to the design phase where we optimize graph appearance and overal dashboard appearance. 
+    - for this, use card layout from `bslib` package.
 
