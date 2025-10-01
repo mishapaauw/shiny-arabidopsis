@@ -1,6 +1,6 @@
 # Shiny Arabidopsis
 
-Building a shiny app to visualize Arabidopsis chromosomes and annotations. This repo acts as practice to develop a GWAS results visualization dashboard. The idea is to visualize a manhattan plot of significant kmers, which you can use to zoom in to a region of interest in a genome browser.
+Building a shiny app to visualize Arabidopsis chromosomes and annotations. Ultimately, I want to develop a GWAS results visualization dashboard. The idea is to visualize a manhattan plot of significant kmers, which you can use to zoom in to a region of interest in a genome browser.
 
 ## igvShiny
 
@@ -35,18 +35,18 @@ Click on a chromosome panel to zoom into that chromosome. Use 'brush selection',
 
 ## TODOs
 
-*Data preparation*:
+**Data preparation**:
 
 - Move all the data preparation steps to a seperate R script, and save everything needed by Shiny in one RData file object.
 - Count number of significant kmers and add this to the valueboxes (we need the 5per and 10per file from the kmerGWAS output for this)
 - Also keep track of how many kmers were mapped/were not mapped.
 
-*BAM file visualization*:
+**BAM file visualization**:
 
 - Add read name to the BAM file, somehow. Probably we should do this in the bowtie mapping step?
 - Make BAM file load upon opening. Currently there's the need to a button to trigger the load.
 
-*Phenotype visualization*:
+**Phenotype visualization**:
 
 - Make sure that the cmd line scripts copy both files ('pheno.phenotypes' and 'pheno.used_phenotypes') to the 
 results folder
@@ -56,14 +56,16 @@ results folder
     - how to select kmers? probably not possible in the IGV window.
     - Need to get presence absence pattern for all kmers instead of top100. (and turn of automated plotting as currently implemented)
 
-*Download results*:
+**Download results**:
 
 - Button to download all graphs as currently shown on screen. 
 
-
-*Finishing touch*:
+**Finishing touch**:
 
 - When everything is implemented, we move to the design phase where we optimize graph appearance and overal dashboard appearance (using `{bslib}` package).
     - Increase font sizes of the graphs
+    - Choose uniform color scheme for all graphs and dashboard
+    - Make hexagon shaped logo
+    - Come up with a cool name integrating: Arabidopsis, GWAS, kmers, Shiny
 
 
