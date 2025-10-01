@@ -84,7 +84,24 @@ phenotype$dataset <- as.factor(phenotype$dataset)
 ##### Shiny dashboard starts here
 
 ui <- page_sidebar(
+  # Set the theme for the dashboard
+  theme = bs_theme(bootswatch = "cosmo"),
+  fillable = FALSE,
+  
+  # Initialize javascript
+  useShinyjs(),
+  
+  # HTML code to be able to define which plots will be able to fade/in out
+  tags$head(
+    tags$style(HTML("
+      .fade-container { transition: opacity 100ms ease-in-out; opacity: 1; }
+      .fade-container.fading { opacity: 0 !important; }
+    "))
+  ),
+  
   title = "kmer GWAS dashboard",
+  
+  # Sidebar contents 
   sidebar = sidebar(
     h4("click to add kmer mapping bam file:"),
     actionButton("addBamLocalFileButton", "BAM local data"),
@@ -97,29 +114,90 @@ ui <- page_sidebar(
   ),
   
   # Main dashboard content goes here
+  layout_columns(
+    
+    # Value boxes
+    card(card_header("Significant kmers"),
+         height = "400px",
+         valueBox("42", "Significant kmers (5 per)", color = "#E69F00", width = "150px"),
+         valueBox("123", "Significant kmers (10 per)", color = "#56B4E9", width = "150px")),
+    
+    # Phenotype histogram
+    card(card_header("Phenotype histogram"),
+         height = "400px",
+         plotOutput('histogram')),
+    
+    # Width ratio for the valueboxes and histogram
+    col_widths = c(3,9)),
 
-  ######### Header section with value boxes
-  h2("kmer GWAS results"),
-  valueBox("42", "Significant kmers (5 per)", color = "#E69F00", width = "150px"),
-  valueBox("123", "Significant kmers (10 per)", color = "#56B4E9", width = "150px"),
-  
-  # histogram
-  plotOutput('histogram'),
-  
-  ######### Manhattan plot section (brushable x axis to determine plotting window of IGV)
-  h2("Manhattan plot"),
-  plotOutput("manhattan", 
-             brush = brushOpts(id = "coord_brush", direction = "x"),
-             click = clickOpts(id = "coord_click")),
-  
-  ######## IGV window section
-  h2("Genome browser"),
-  igvShinyOutput('igvShiny')
+  # Manhattan plot section
+  card(card_header("Manhattan plot"),
+       id = "fade-container", class = "fade-container",
+       height = "400px",
+       plotOutput("manhattan", 
+                  brush = brushOpts(id = "coord_brush", direction = "x", delayType = "debounce", delay = 700),
+                  click = clickOpts(id = "click_event"),
+                  dblclick = dblclickOpts(id = "double_click_event"))
+       ),
+
+  # IGV browser
+  card(card_header("IGV browser"),
+       height = "400px",
+       igvShinyOutput('igvShiny')
+  )
 )
 
 server <-
   function(input, output, session) {
     
+    # This code enables the selection of facet via clicking
+    selectedFacet <- reactiveVal(NULL)
+    fade_ms <- 100
+    
+    # Definition of fading functions via javascript
+    fade_out <- function() {
+      runjs("$('#fade-container').addClass('fading');")
+    }
+    fade_in <- function() {
+      runjs("$('#fade-container').removeClass('fading');")
+    }
+    
+    # Upon click, fade out current plot and fade in zoomed in plot
+    observeEvent(input$click_event, {
+      
+      if (!is.null(selectedFacet())) {
+        return()     # Ignore single click events while already in zoomed state
+      }
+    
+      facet_clicked <- input$click_event$panelvar1
+      
+      if (is.null(facet_clicked)) return()
+      
+      fade_out()
+      later(function() {
+        selectedFacet(facet_clicked)
+        session$onFlush(function() fade_in(), once = TRUE)
+      }, fade_ms/1000)
+    })
+    
+    # Double click = zoom back out
+    observeEvent(input$double_click_event, {
+      fade_out()
+      later(function() {
+        selectedFacet(NULL)
+        session$onFlush(function() fade_in(), once = TRUE)
+      }, fade_ms/1000)
+    })
+    
+    # Here we subset the datasets upon clicking
+    chromosomes <- reactive({
+      if (is.null(selectedFacet())) chromosome_lengths_l else filter(chromosome_lengths_l, chr == selectedFacet())
+    })
+    sig_kmers <- reactive({
+      if (is.null(selectedFacet())) kmers_merged else filter(kmers_merged, chr == selectedFacet())
+    })
+    
+      
     # Phenotype histograms
     output$histogram <- renderPlot({
       selected <- input$datasets
@@ -143,14 +221,14 @@ server <-
     # The manhattan plot is made here
     output$manhattan <- renderPlot({
       ggplot() + 
-        geom_blank(data = chromosome_lengths_l, aes(x = bp, y = threshold_10 - 0.5)) + 
+        geom_blank(data = chromosomes(), aes(x = bp, y = threshold_10 - 0.5)) + 
         facet_grid(~chr, scales = "free_x", space = "free_x") +
         geom_hline(yintercept = threshold_10, col = "#56B3E9", linetype = "dashed") +
         geom_hline(yintercept = threshold_5, col = "#E69F00", linetype = "dashed") +
         
         # I use height jitter to avoid overlapping points with nearly the same location and the same p value
         # Possible edit: make this interactive to enable people to make a 'true' plot and jittered plot.
-        geom_jitter(data = kmers_merged, aes(x = position, y = -log10(p_val)), alpha = 0.3, width = 0, height = 0.05) + 
+        geom_jitter(data = sig_kmers(), aes(x = position, y = -log10(p_val)), alpha = 0.3, width = 0, height = 0.05) + 
         facet_grid(~chr, scales = "free_x", space = "free_x") + 
         theme_manhattan
      
@@ -190,17 +268,6 @@ server <-
       showGenomicRegion(session, id = "igvShiny", new_locus)
     })
   
-    # or on click event, with 15kb up- and downstream of click. Not sure which one works best.
-    observeEvent(input$coord_click, {
-      
-      new_x <- input$coord_click$x
-      new_chromosome <- input$coord_click$panelvar1
-      
-      new_locus <- paste0(new_chromosome, ":", new_x - 15000, "-", new_x + 15000)
-      
-      # Update IGV viewer to show the selected region
-      showGenomicRegion(session, id = "igvShiny", new_locus)
-    })
 }
 
 

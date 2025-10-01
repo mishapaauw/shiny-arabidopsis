@@ -25,9 +25,15 @@ gunzip Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
 samtools faidx Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
 ```
 
-## TODOs
+## User instructions
 
-The following things need to be implemented
+Click on a chromosome panel to zoom into that chromosome. Use 'brush selection', i.e. dragging across the x-axis, to zoom the IGV window into the selected area.
+
+**Known bugs**
+
+- If the user starts brushing in the non-zoomed facetted window, it triggers the zoom event already. How to fix this?
+
+## TODOs
 
 *Data preparation*:
 
@@ -37,19 +43,27 @@ The following things need to be implemented
 
 *BAM file visualization*:
 
-- Add read name to the BAM file, somehow. Probably we should do this in the bowtie mapping step
+- Add read name to the BAM file, somehow. Probably we should do this in the bowtie mapping step?
 - Make BAM file load upon opening. Currently there's the need to a button to trigger the load.
 
 *Phenotype visualization*:
 
-- Make phenotype distribution histogram: done
-- Make sure that the cmd line scripts copy both files ('pheno.phenotypes' and 'pheno.used_phenotypes') to the results folder 
-    
+- Make sure that the cmd line scripts copy both files ('pheno.phenotypes' and 'pheno.used_phenotypes') to the 
+results folder
+- Highlight Col-0 or other accession in the phenotype distribution graph
 - Make 'candlestick chart' of selected kmers, with option to highlight genome of interest
     - For this, we need a mapping file between nordberg IDs and accession names.
     - how to select kmers? probably not possible in the IGV window.
     - Need to get presence absence pattern for all kmers instead of top100. (and turn of automated plotting as currently implemented)
 
-When everything is implemented, we move to the design phase where we optimize graph appearance and overal dashboard appearance. 
-    - for this, use card layout from `bslib` package.
+*Download results*:
+
+- Button to download all graphs as currently shown on screen. 
+
+
+*Finishing touch*:
+
+- When everything is implemented, we move to the design phase where we optimize graph appearance and overal dashboard appearance (using `{bslib}` package).
+    - Increase font sizes of the graphs
+
 
